@@ -1,6 +1,6 @@
-const packetConsumer = async function packetConsumer(context, push) {
-  await this.channel.assertQueue(context.route, { durable: false });
-  await this.channel.consume(
+const packetConsumer = async (context, push) => {
+  await context.channel.assertQueue(context.route, { durable: false });
+  await context.channel.consume(
     context.route,
     (rabbitMessage) => {
       try {
