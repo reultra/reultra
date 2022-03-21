@@ -22,6 +22,8 @@ class TcpServer extends Server {
   handleConnection(socket) {
     // eslint-disable-next-line no-param-reassign
     const context = {
+      app: this,
+      state: {},
       buffer: Buffer.alloc(0),
       sender: this.nextClientId(),
     };
