@@ -1,0 +1,13 @@
+{
+  "name": "@reultra/core",
+  "version": "0.1.0",
+  "author": "Jean-Baptiste Martin",
+  "main": "lib/index.js",
+  "dependencies": {
+    "amqplib": "^0.8.0"
+  },
+  "engines" : {
+    "npm" : ">=8.0.0",
+    "node" : ">=17.0.0"
+  }
+}

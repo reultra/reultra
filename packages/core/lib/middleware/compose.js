@@ -30,4 +30,4 @@ const compose = (middleware) => (rootContext) => {
   dispatch(rootContext, 0);
 };
 
-module.export = compose;
+module.exports = compose;
