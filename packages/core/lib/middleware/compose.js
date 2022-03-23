@@ -31,7 +31,3 @@ const compose = (middleware) => (rootContext) => {
 };
 
 module.exports = compose;
-
-// push() -> parent context
-// push(error) -> error, parent context
-// push(null, context) -> new context
