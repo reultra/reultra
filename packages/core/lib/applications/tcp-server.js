@@ -9,6 +9,7 @@ class TcpServer extends Application {
     const { name = crypto.randomUUID() } = options;
     this.name = name;
     this.seq = 1;
+    this.sockets = new Map();
   }
 
   createConnectionUID() {
@@ -30,6 +31,7 @@ class TcpServer extends Application {
     const handler = this.createHandler();
     server.on('connection', (socket) => {
       const context = this.createContext();
+      this.sockets.set(context.sender, socket);
       this.emit('connect', context);
       socket.setNoDelay(true);
       socket.on('data', (data) => {
@@ -37,10 +39,20 @@ class TcpServer extends Application {
         handler(context);
       });
       socket.on('close', () => {
+        this.sockets.delete(context.sender);
         this.emit('disconnect', context);
       });
     });
     return server.listen(...args);
+  }
+
+  send() {
+    return (context) => {
+      const socket = this.sockets.get(context.sender);
+      if (socket) {
+        socket.write(context.data);
+      }
+    };
   }
 }
 
