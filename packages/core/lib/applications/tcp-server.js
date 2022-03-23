@@ -20,8 +20,7 @@ class TcpServer extends Application {
   createContext() {
     return {
       app: this,
-      state: {},
-      buffer: Buffer.alloc(0),
+      state: { buffer: Buffer.alloc(0) },
       sender: this.createConnectionUID(),
     };
   }
@@ -34,7 +33,7 @@ class TcpServer extends Application {
       this.emit('connect', context);
       socket.setNoDelay(true);
       socket.on('data', (data) => {
-        context.buffer = Buffer.concat([context.buffer, data]);
+        context.state.buffer = Buffer.concat([context.state.buffer, data]);
         handler(context);
       });
       socket.on('close', () => {
