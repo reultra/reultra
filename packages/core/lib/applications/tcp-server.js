@@ -17,19 +17,28 @@ class TcpServer extends Application {
     return uid;
   }
 
+  createContext() {
+    return {
+      app: this,
+      state: {},
+      buffer: Buffer.alloc(0),
+      sender: this.createConnectionUID(),
+    };
+  }
+
   listen(...args) {
     const server = new Server();
+    const handler = this.createHandler();
     server.on('connection', (socket) => {
-      const context = {
-        app: this,
-        state: {},
-        buffer: Buffer.alloc(0),
-        sender: this.createConnectionUID(),
-      };
+      const context = this.createContext();
+      this.emit('connect', context);
       socket.setNoDelay(true);
       socket.on('data', (data) => {
         context.buffer = Buffer.concat([context.buffer, data]);
-        this.callback(context);
+        handler(context);
+      });
+      socket.on('close', () => {
+        this.emit('disconnect', context);
       });
     });
     return server.listen(...args);

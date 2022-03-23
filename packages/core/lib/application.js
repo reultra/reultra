@@ -1,13 +1,14 @@
+const { EventEmitter } = require('events');
 const compose = require('./middleware/compose');
 
-class Application {
+class Application extends EventEmitter {
   constructor() {
+    super();
     this.middleware = [];
   }
 
-  callback(ctx) {
-    const fnMiddleware = compose(this.middleware);
-    return fnMiddleware.bind(null, ctx);
+  createHandler() {
+    return compose(this.middleware);
   }
 
   use(middleware) {

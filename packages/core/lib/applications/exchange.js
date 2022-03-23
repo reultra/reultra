@@ -1,58 +1,72 @@
 const amqp = require('amqplib');
+const Application = require('../application');
 
-class Exchange {
-  async connect(url = 'amqp://localhost', options = {}) {
-    this.client = await amqp.connect(url, options);
-    this.channel = await this.client.createChannel();
+class Exchange extends Application {
+  constructor() {
+    super();
+    this.middleware.unshift(this.constructor.consume());
   }
 
+  async connect(...args) {
+    this.client = await amqp.connect(...args);
+    this.channel = await this.client.createChannel();
+    this.handler = this.createHandler();
+  }
 
-}
+  // internal middleware
+  static consume() {
+    return async (context, push) => {
+      context.route = context.raw.fields.routingKey;
+      context.sender = context.raw.properties.headers.sender;
+      context.packet = {
+        type: context.raw.properties.type,
+        payload: context.raw.content,
+      };
+      push();
+    };
+  }
 
-module.exports = Exchange;
+  createContext() {
+    return { app: this, state: {} };
+  }
 
-const amqp = require('amqplib');
+  pair(server) {
+    server.on('connect', async (context) => {
+      const consumerTag = await this.subscribe(context.sender);
+      server.on('disconnect', async () => {
+        await this.cancel(consumerTag);
+      });
+    });
+  }
 
-const DEFAULT_URL = 'amqp://localhost';
-
-const consume = async (options) => {
-  const { url = DEFAULT_URL, ...ampqOptions } = options;
-  const client = await amqp.connect(url, ampqOptions);
-  const channel = await client.createChannel();
-  return async (context, push) => {
-    await channel.assertQueue(context.route, { durable: false });
-    await channel.consume(
-      context.route,
-      (rabbitMessage) => {
-        try {
-          context.sender = rabbitMessage.properties.headers.sender;
-          context.packet = {
-            type: rabbitMessage.properties.type,
-            payload: rabbitMessage.content,
-          };
-          push();
-        } catch (error) {
-          push(error);
-        }
+  async subscribe(queue) {
+    const context = this.createContext();
+    await this.channel.assertQueue(queue, { durable: false });
+    context.consumerTag = await this.channel.consume(
+      queue,
+      (msg) => {
+        this.handler({ ...context, raw: msg });
       },
       { noAck: true }
     );
-  };
-};
+    return context.consumerTag;
+  }
 
-const publish = async (options) => {
-  const { url = DEFAULT_URL, ...ampqOptions } = options;
-  const client = await amqp.connect(url, ampqOptions);
-  const channel = await client.createChannel();
-  return async (context, push) => {
-    const route = context.route || context.packet.type;
-    await channel.assertQueue(route, { durable: false });
-    await channel.sendToQueue(route, context.packet.payload, {
-      type: context.packet.type,
-      headers: { sender: context.sender },
-    });
-    push();
-  };
-};
+  async cancel(consumerTag) {
+    await this.channel.cancel(consumerTag);
+  }
 
-module.exports = { consume, publish };
+  publish() {
+    return async (context, push) => {
+      context.route ||= context.packet.type;
+      await this.channel.assertQueue(context.route, { durable: false });
+      await this.channel.sendToQueue(context.route, context.packet.payload, {
+        type: context.packet.type,
+        headers: { sender: context.sender },
+      });
+      push();
+    };
+  }
+}
+
+module.exports = Exchange;
