@@ -1,9 +1,10 @@
-const isErrorMiddleware = (middleware) => middleware.length === 4;
+const isErrorMiddleware = (middleware) => middleware.length === 3;
 
-const exec = (middleware, context, push) => {
+const exec = (middleware, parentError, context, push) => {
   (async () => {
     try {
-      await middleware(context, push);
+      if (parentError) await middleware(parentError, context, push);
+      else await middleware(context, push);
     } catch (error) {
       push(error);
     }
@@ -11,23 +12,26 @@ const exec = (middleware, context, push) => {
 };
 
 const compose = (middleware) => (rootContext) => {
-  const dispatch = (context, i, error) => {
-    if (i === middleware.length) {
-      if (error) throw error;
-      return;
-    }
+  const dispatch = (i, parentContext, error, context) => {
+    let j = i;
     if (error) {
-      let j = i;
       while (j < middleware.length && !isErrorMiddleware(middleware[j])) {
         j += 1;
       }
-      dispatch(context, j, error);
     }
-    const clonedContext = { ...context };
-    const nextDispatch = dispatch.bind(null, clonedContext, i + 1);
-    exec(middleware[i], clonedContext, nextDispatch);
+    if (j === middleware.length) {
+      if (error) throw error;
+      return;
+    }
+    const nextContext = { ...parentContext, ...context };
+    const nextDispatch = dispatch.bind(null, j + 1, nextContext);
+    exec(middleware[j], error, nextContext, nextDispatch);
   };
-  dispatch(rootContext, 0);
+  dispatch(0, rootContext);
 };
 
 module.exports = compose;
+
+// push() -> parent context
+// push(error) -> error, parent context
+// push(null, context) -> new context
