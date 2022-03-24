@@ -42,14 +42,13 @@ class Exchange extends Application {
   async subscribe(queue) {
     const context = this.createContext();
     await this.channel.assertQueue(queue, { durable: false });
-    context.consumerTag = await this.channel.consume(
+    return this.channel.consume(
       queue,
       (msg) => {
         this.handler({ ...context, raw: msg });
       },
       { noAck: true }
     );
-    return context.consumerTag;
   }
 
   async cancel(consumerTag) {
