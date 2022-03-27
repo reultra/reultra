@@ -27,7 +27,7 @@ class Exchange extends Application {
   }
 
   createContext() {
-    return { app: this, state: {} };
+    return { app: this, session: {} };
   }
 
   pair(server) {

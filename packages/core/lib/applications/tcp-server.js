@@ -21,7 +21,7 @@ class TcpServer extends Application {
   createContext() {
     return {
       app: this,
-      state: { buffer: Buffer.alloc(0) },
+      session: { buffer: Buffer.alloc(0) },
       sender: this.createConnectionUID(),
     };
   }
@@ -35,7 +35,7 @@ class TcpServer extends Application {
       this.emit('connect', context);
       socket.setNoDelay(true);
       socket.on('data', (data) => {
-        context.state.buffer = Buffer.concat([context.state.buffer, data]);
+        context.session.buffer = Buffer.concat([context.session.buffer, data]);
         handler(context);
       });
       socket.on('close', () => {
