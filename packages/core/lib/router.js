@@ -12,12 +12,12 @@ class Router {
   }
 
   middleware() {
-    return async (context, push) => {
+    return async (session, state, push) => {
       this.stack.forEach(({ route, middleware }) => {
-        if (context.route === route) {
+        if (state.key === route) {
           (async () => {
             try {
-              await middleware(context, push);
+              await middleware(session, state, push);
             } catch (error) {
               push(error);
             }

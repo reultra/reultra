@@ -1,6 +1,8 @@
 const amqp = require('amqplib');
 const Application = require('../application');
 
+const ROOT_EXCHANGE = 'root';
+
 class Exchange extends Application {
   constructor() {
     super();
@@ -15,37 +17,36 @@ class Exchange extends Application {
 
   // internal middleware
   static consume() {
-    return async (context, push) => {
-      context.route = context.raw.fields.routingKey;
-      context.sender = context.raw.properties.headers.sender;
-      context.packet = {
-        type: context.raw.properties.type,
-        payload: context.raw.content,
-      };
-      push();
+    return async (session, state, push) => {
+      push(null, {
+        key: state.message.fields.routingKey,
+        from: state.raw.properties.headers.from,
+        packet: {
+          type: state.raw.properties.type,
+          payload: state.raw.content,
+        },
+      });
     };
   }
 
-  createContext() {
-    return { app: this, session: {} };
-  }
-
   pair(server) {
-    server.on('connect', async (context) => {
-      const consumerTag = await this.subscribe(context.sender);
+    server.on('connect', async (serverSession) => {
+      const consumerTag = await this.subscribe(serverSession.id);
       server.on('disconnect', async () => {
         await this.cancel(consumerTag);
       });
     });
   }
 
-  async subscribe(queue) {
-    const context = this.createContext();
-    await this.channel.assertQueue(queue, { durable: false });
+  async subscribe(key, options = {}) {
+    const { exchange = ROOT_EXCHANGE, type = 'topic' } = options;
+    await this.channel.assertExchange(exchange, type, { durable: false });
+    const { queue } = await this.channel.assertQueue('', { exclusive: true });
+    await this.channel.bindQueue(queue, exchange, key);
     return this.channel.consume(
       queue,
-      (msg) => {
-        this.handler({ ...context, raw: msg });
+      (message) => {
+        this.handler({ app: this }, { message });
       },
       { noAck: true }
     );
@@ -55,13 +56,13 @@ class Exchange extends Application {
     await this.channel.cancel(consumerTag);
   }
 
-  publish() {
-    return async (context, push) => {
-      context.route ||= context.packet.type;
-      await this.channel.assertQueue(context.route, { durable: false });
-      await this.channel.sendToQueue(context.route, context.packet.payload, {
-        type: context.packet.type,
-        headers: { sender: context.sender },
+  publish(options = {}) {
+    const { exchange = ROOT_EXCHANGE } = options;
+    return async (session, state, push) => {
+      const key = state.key || state.packet.type;
+      await this.channel.publish(exchange, key, state.packet.payload, {
+        type: state.packet.type,
+        headers: { from: state.from },
       });
       push();
     };

@@ -1,5 +1,5 @@
 const { EventEmitter } = require('events');
-const compose = require('./middleware/compose');
+const Middleware = require('./middleware');
 
 class Application extends EventEmitter {
   constructor() {
@@ -8,7 +8,7 @@ class Application extends EventEmitter {
   }
 
   createHandler() {
-    return compose(this.middleware);
+    return Middleware.compose(this.middleware);
   }
 
   use(middleware) {

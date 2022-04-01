@@ -9,48 +9,47 @@ class TcpServer extends Application {
     const { name = crypto.randomUUID() } = options;
     this.name = name;
     this.seq = 1;
-    this.sockets = new Map();
+    this.sessions = new Map();
   }
 
-  createConnectionUID() {
-    const uid = `${this.name}/${this.seq}`;
-    this.seq += 1;
-    return uid;
-  }
-
-  createContext() {
-    return {
+  createSession(socket) {
+    const session = {
       app: this,
-      session: { buffer: Buffer.alloc(0) },
-      sender: this.createConnectionUID(),
+      buffer: Buffer.alloc(0),
+      id: `${this.name}/${this.seq}`,
+      socket,
     };
+    this.seq += 1;
+    return session;
+  }
+
+  handleConnection(socket) {
+    const session = this.createSession(socket);
+    this.sessions.set(session.id, session);
+    socket.setNoDelay(true);
+    socket.on('data', (data) => {
+      session.buffer = Buffer.concat([session.buffer, data]);
+      this.handler(session, {});
+    });
+    socket.on('close', () => {
+      this.sessions.delete(session.id);
+      this.emit('disconnect', session);
+    });
+    this.emit('connect', session);
   }
 
   listen(...args) {
     const server = new Server();
-    const handler = this.createHandler();
-    server.on('connection', (socket) => {
-      const context = this.createContext();
-      this.sockets.set(context.sender, socket);
-      this.emit('connect', context);
-      socket.setNoDelay(true);
-      socket.on('data', (data) => {
-        context.session.buffer = Buffer.concat([context.session.buffer, data]);
-        handler(context);
-      });
-      socket.on('close', () => {
-        this.sockets.delete(context.sender);
-        this.emit('disconnect', context);
-      });
-    });
+    this.handler = this.createHandler();
+    server.on('connection', this.handleConnection.bind(this));
     return server.listen(...args);
   }
 
   send() {
-    return (context) => {
-      const socket = this.sockets.get(context.sender);
+    return (session, state) => {
+      const socket = this.sessions.get(state.id)?.socket;
       if (socket) {
-        socket.write(context.data);
+        socket.write(state.data);
       }
     };
   }
