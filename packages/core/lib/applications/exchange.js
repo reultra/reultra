@@ -31,15 +31,15 @@ class Exchange extends Application {
 
   pair(server) {
     server.on('connect', async (serverSession) => {
-      const consumerTag = await this.subscribe(serverSession.id);
+      await this.subscribe(serverSession.id, { consumerTag: serverSession.id });
       server.on('disconnect', async () => {
-        await this.cancel(consumerTag);
+        await this.cancel(serverSession.id);
       });
     });
   }
 
   async subscribe(key, options = {}) {
-    const { exchange = ROOT_EXCHANGE, type = 'topic' } = options;
+    const { exchange = ROOT_EXCHANGE, type = 'topic', consumerTag } = options;
     await this.channel.assertExchange(exchange, type, { durable: false });
     const { queue } = await this.channel.assertQueue('', { exclusive: true });
     await this.channel.bindQueue(queue, exchange, key);
@@ -48,7 +48,7 @@ class Exchange extends Application {
       (message) => {
         this.handler({ app: this }, { message });
       },
-      { noAck: true }
+      { consumerTag, noAck: true }
     );
   }
 
