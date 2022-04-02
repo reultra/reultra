@@ -16,7 +16,7 @@ class TcpServer extends Application {
     const session = {
       app: this,
       buffer: Buffer.alloc(0),
-      id: `${this.name}/${this.seq}`,
+      id: `${this.name}.${this.seq}`,
       socket,
     };
     this.seq += 1;

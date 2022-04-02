@@ -29,15 +29,6 @@ class Exchange extends Application {
     };
   }
 
-  pair(server) {
-    server.on('connect', async (serverSession) => {
-      await this.subscribe(serverSession.id, { consumerTag: serverSession.id });
-      server.on('disconnect', async () => {
-        await this.cancel(serverSession.id);
-      });
-    });
-  }
-
   async subscribe(key, options = {}) {
     const { exchange = ROOT_EXCHANGE, type = 'topic', consumerTag } = options;
     await this.channel.assertExchange(exchange, type, { durable: false });
