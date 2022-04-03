@@ -1,9 +1,9 @@
 const amqp = require('amqplib');
-const Application = require('../application');
+const { Application } = require('@reultra/core');
 
 const ROOT_EXCHANGE = 'root';
 
-class Exchange extends Application {
+class Channel extends Application {
   constructor() {
     super();
     this.middleware.unshift(this.constructor.consume());
@@ -60,4 +60,4 @@ class Exchange extends Application {
   }
 }
 
-module.exports = Exchange;
+module.exports = Channel;

@@ -1,7 +1,7 @@
 const { Buffer } = require('buffer');
 const crypto = require('crypto');
 const { Server } = require('net');
-const Application = require('../application');
+const { Application } = require('@reultra/core');
 
 class TcpServer extends Application {
   constructor(options = {}) {
