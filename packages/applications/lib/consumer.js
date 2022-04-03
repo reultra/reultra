@@ -1,7 +1,7 @@
 const amqp = require('amqplib');
 const { Application } = require('@reultra/core');
 
-class BrokerClient extends Application {
+class Consumer extends Application {
   async connect(...args) {
     this.client = await amqp.connect(...args);
     this.channel = await this.client.createChannel();
@@ -54,4 +54,4 @@ class BrokerClient extends Application {
   }
 }
 
-module.exports = BrokerClient;
+module.exports = Consumer;
