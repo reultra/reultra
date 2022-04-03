@@ -5,6 +5,7 @@ class Application extends EventEmitter {
   constructor() {
     super();
     this.middleware = [];
+    this.session = { app: this };
   }
 
   createHandler() {
