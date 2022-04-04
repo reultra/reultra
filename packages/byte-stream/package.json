@@ -1,0 +1,7 @@
+{
+  "name": "@reultra/byte-stream",
+  "version": "0.1.0",
+  "description": "A wrapper to consume Node.js buffers",
+  "author": "Jean-Baptiste Martin",
+  "main": "lib/index.js"
+}
