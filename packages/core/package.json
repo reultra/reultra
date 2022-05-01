@@ -1,5 +1,5 @@
 {
-  "name": "@reultra/applications",
+  "name": "@reultra/core",
   "version": "0.1.0",
   "author": "Jean-Baptiste Martin",
   "main": "lib/index.js",
