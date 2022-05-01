@@ -1,35 +1,35 @@
-const { Buffer } = require('buffer');
 const crypto = require('crypto');
 const { Server } = require('net');
-const { Application } = require('@reultra/core');
+const { EventEmitter } = require('events');
 
-class TcpServer extends Application {
+class TcpServer extends EventEmitter {
   constructor(options = {}) {
     super();
-    const { name = crypto.randomUUID() } = options;
+    const { name = crypto.randomUUID(), deserialize, serialize } = options;
     this.name = name;
-    this.seq = 1;
+    this.totalConnectionCount = 1;
     this.sessions = new Map();
-  }
-
-  createSession(socket) {
-    const session = {
-      ...this.session,
-      buffer: Buffer.alloc(0),
-      id: `${this.name}.${this.seq}`,
-      socket,
-    };
-    this.seq += 1;
-    return session;
+    if (deserialize) this.deserialize = deserialize.bind(this);
+    if (serialize) this.serialize = serialize.bind(this);
   }
 
   handleConnection(socket) {
-    const session = this.createSession(socket);
+    const session = Object.create({});
+    session.id = `${this.name}.${this.totalConnectionCount}`;
+    let buffer = Buffer.alloc(0);
+    this.totalConnectionCount += 1;
     this.sessions.set(session.id, session);
     socket.setNoDelay(true);
     socket.on('data', (data) => {
-      session.buffer = Buffer.concat([session.buffer, data]);
-      this.handler(session, {});
+      buffer = Buffer.concat([buffer, data]);
+      let message;
+      do {
+        message = this.deserialize(session, buffer);
+        if (message) {
+          buffer = buffer.subarray(message.size);
+          this.emit('message', session, message);
+        }
+      } while (message);
     });
     socket.on('close', () => {
       this.sessions.delete(session.id);
@@ -40,18 +40,25 @@ class TcpServer extends Application {
 
   listen(...args) {
     const server = new Server();
-    this.handler = this.createHandler();
     server.on('connection', this.handleConnection.bind(this));
     return server.listen(...args);
   }
 
-  send() {
-    return (session, state) => {
-      const socket = this.sessions.get(state.id)?.socket;
-      if (socket) {
-        socket.write(state.data);
-      }
-    };
+  // eslint-disable-next-line class-methods-use-this
+  deserialize() {
+    throw new Error('abstract method deserialize must be implemented');
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  serialize() {
+    throw new Error('abstract method serialize must be implemented');
+  }
+
+  send(sessionId, data) {
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.socket.write(this.serialize(session, data));
+    }
   }
 }
 

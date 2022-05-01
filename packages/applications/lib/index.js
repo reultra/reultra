@@ -1,7 +1,9 @@
-const Consumer = require('./consumer');
+const Broker = require('./broker');
+const MessageManager = require('./message-manager');
 const TcpServer = require('./tcp-server');
 
 module.exports = {
-  Consumer,
+  Broker,
+  MessageManager,
   TcpServer,
 };
