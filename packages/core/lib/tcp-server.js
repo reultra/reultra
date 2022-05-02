@@ -5,21 +5,21 @@ const { EventEmitter } = require('events');
 class TcpServer extends EventEmitter {
   constructor(options = {}) {
     super();
-    const { name = crypto.randomUUID(), deserialize, serialize } = options;
-    this.name = name;
-    this.totalConnectionCount = 1;
+    const { deserialize, serialize } = options;
+    this.uid = crypto.randomUUID();
+    this.totalConnectionCount = 0;
     this.sessions = new Map();
     if (deserialize) this.deserialize = deserialize.bind(this);
     if (serialize) this.serialize = serialize.bind(this);
   }
 
   handleConnection(socket) {
-    const session = Object.create({});
-    session.id = `${this.name}.${this.totalConnectionCount}`;
-    let buffer = Buffer.alloc(0);
     this.totalConnectionCount += 1;
-    this.sessions.set(session.id, session);
+    const id = `session.${this.totalConnectionCount}`;
+    const session = { server: this.uid, id, socket };
+    this.sessions.set(id, session);
     socket.setNoDelay(true);
+    let buffer = Buffer.alloc(0);
     socket.on('data', (data) => {
       buffer = Buffer.concat([buffer, data]);
       let message;
@@ -32,7 +32,7 @@ class TcpServer extends EventEmitter {
       } while (message);
     });
     socket.on('close', () => {
-      this.sessions.delete(session.id);
+      this.sessions.delete(id);
       this.emit('disconnect', session);
     });
     this.emit('connect', session);
