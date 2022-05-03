@@ -28,10 +28,6 @@ class TcpGateway extends TcpServer {
   }
 
   async handleMessage(session, message) {
-    // si on veut discuter avec un exchange auth
-    // si auth est défini on l'utilise
-    // sinon on affecte un id aléatoire qui va être intégré à la routingKey (pour consistent hash)
-    // on effectue ensuite un handshake qui va réaffecter un id définitif à la session
     await this.broker.publish(message.service, message.key, message.payload, {
       headers: session.headers,
       type: message.key,
