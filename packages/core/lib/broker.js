@@ -13,12 +13,20 @@ class Broker extends EventEmitter {
     this.channel = await this.client.createChannel();
   }
 
-  async assertExchange(...args) {
-    return this.channel.assertExchange(...args);
+  async assertExchange(exchange, type, options) {
+    return this.channel.assertExchange(exchange, type, {
+      durable: false,
+      autoDelete: true,
+      ...options,
+    });
   }
 
-  async assertQueue(...args) {
-    return this.channel.assertQueue(...args);
+  async assertQueue(queue, options) {
+    return this.channel.assertQueue(queue, options, {
+      durable: false,
+      autoDelete: true,
+      ...options,
+    });
   }
 
   async bindQueue(...args) {
@@ -33,8 +41,11 @@ class Broker extends EventEmitter {
     return this.channel.publish(...args);
   }
 
-  async consume(...args) {
-    return this.channel.consume(...args);
+  async consume(queue, listener, options) {
+    return this.channel.consume(queue, listener, {
+      noAck: true,
+      ...options,
+    });
   }
 }
 
