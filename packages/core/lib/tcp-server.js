@@ -1,12 +1,12 @@
 const crypto = require('crypto');
 const { Server } = require('net');
-const { EventEmitter } = require('events');
+const { EventEmitter, captureRejectionSymbol } = require('events');
 
 class TcpServer extends EventEmitter {
   constructor(options = {}) {
-    super();
+    super({ captureRejections: true });
     const { deserialize, serialize } = options;
-    this.uid = crypto.randomUUID();
+    this.uuid = crypto.randomUUID();
     this.totalConnectionCount = 0;
     this.sessions = new Map();
     if (deserialize) this.deserialize = deserialize.bind(this);
@@ -16,7 +16,7 @@ class TcpServer extends EventEmitter {
   handleConnection(socket) {
     this.totalConnectionCount += 1;
     const id = `session.${this.totalConnectionCount}`;
-    const session = { server: this.uid, id, socket };
+    const session = { server: this.uuid, id, socket };
     this.sessions.set(id, session);
     socket.setNoDelay(true);
     let buffer = Buffer.alloc(0);
@@ -24,10 +24,20 @@ class TcpServer extends EventEmitter {
       buffer = Buffer.concat([buffer, data]);
       let message;
       do {
-        message = this.deserialize(session, buffer);
+        try {
+          message = this.deserialize(session, buffer);
+        } catch (error) {
+          this.emitError('messageError', error);
+          socket.destroy(error);
+          return;
+        }
         if (message) {
           buffer = buffer.subarray(message.size);
-          this.emit('message', session, message);
+          try {
+            this.emit('message', session, message);
+          } catch (error) {
+            this.emitError('logicError', error, 'message', session, message);
+          }
         }
       } while (message);
     });
@@ -35,6 +45,7 @@ class TcpServer extends EventEmitter {
       this.sessions.delete(id);
       this.emit('disconnect', session);
     });
+    socket.on('error', () => {});
     this.emit('connect', session);
   }
 
@@ -42,6 +53,18 @@ class TcpServer extends EventEmitter {
     const server = new Server();
     server.on('connection', this.handleConnection.bind(this));
     return server.listen(...args);
+  }
+
+  emitError(errorName, error, ...args) {
+    if (this.listenerCount(errorName) > 0) {
+      this.emit(errorName, error, ...args);
+    } else {
+      this.emit('error', error);
+    }
+  }
+
+  [captureRejectionSymbol](error, event, ...args) {
+    this.emit('logicError', error, event, ...args);
   }
 
   // eslint-disable-next-line class-methods-use-this

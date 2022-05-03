@@ -18,31 +18,45 @@ class MessageManager extends EventEmitter {
     await this.broker.assertExchange(exchange, 'topic', { durable: false });
     const { queue } = await this.broker.assertQueue('', { durable: false });
     await this.broker.bindQueue(queue, exchange, pattern);
-    return this.broker.consume(
-      queue,
-      (message) => {
-        this.emit('message', message);
-        if (this.listenerCount(message.properties.type) > 0) {
-          const deserialized = this.deserialize(message);
-          try {
-            this.emit(
-              message.properties.type,
-              deserialized,
-              message.properties.headers
-            );
-          } catch (error) {
-            this.emit(
-              'logicError',
-              error,
-              message.properties.type,
-              deserialized,
-              message.properties.headers
-            );
-          }
-        }
-      },
-      { noAck: true }
-    );
+    return this.broker.consume(queue, this.handleConsume.bind(this), {
+      noAck: true,
+    });
+  }
+
+  handleConsume(message) {
+    this.emit('message', message);
+    if (this.listenerCount(message.properties.type) > 0) {
+      let deserialized;
+      try {
+        deserialized = this.deserialize(message);
+      } catch (error) {
+        this.emitError('messageError', error);
+        return;
+      }
+      try {
+        this.emit(
+          message.properties.type,
+          deserialized,
+          message.properties.headers
+        );
+      } catch (error) {
+        this.emitError(
+          'logicError',
+          error,
+          message.properties.type,
+          deserialized,
+          message.properties.headers
+        );
+      }
+    }
+  }
+
+  emitError(errorName, error, ...args) {
+    if (this.listenerCount(errorName) > 0) {
+      this.emit(errorName, error, ...args);
+    } else {
+      this.emit('error', error);
+    }
   }
 
   [captureRejectionSymbol](error, event, ...args) {
@@ -59,10 +73,9 @@ class MessageManager extends EventEmitter {
     throw new Error('abstract method serialize must be implemented');
   }
 
-  async publish(exchange, queue, message, options) {
-    return this.broker.publish(exchange, queue, this.serialize(message), {
+  async publish(exchange, message, routingKey = message.constructor.key) {
+    return this.broker.publish(exchange, routingKey, this.serialize(message), {
       type: message.constructor.key,
-      ...options,
     });
   }
 }
