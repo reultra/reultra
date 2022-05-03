@@ -4,6 +4,7 @@ const Broker = require('./broker');
 class TcpGateway extends TcpServer {
   constructor(options = {}) {
     super(options);
+    this.exchange = options.exchange || 'gateway';
     this.broker = new Broker();
     this.on('connect', this.handleConnect.bind(this));
     this.on('message', this.handleMessage.bind(this));
@@ -11,9 +12,11 @@ class TcpGateway extends TcpServer {
 
   async connect(...args) {
     await this.broker.connect(...args);
-    await this.broker.assertExchange(this.uuid, 'topic', { durable: false });
+    await this.broker.assertExchange(this.exchange, 'topic', {
+      durable: false,
+    });
     const { queue } = await this.broker.assertQueue('', { durable: false });
-    await this.broker.bindQueue(queue, this.uuid, 'session.*');
+    await this.broker.bindQueue(queue, this.exchange, 'session.*');
     await this.broker.consume(
       queue,
       (message) => {
@@ -23,8 +26,9 @@ class TcpGateway extends TcpServer {
     );
   }
 
-  async handleConnect(session) {
-    session.headers = { gateway: this.uuid, sessionId: session.id };
+  // eslint-disable-next-line class-methods-use-this
+  handleConnect(session) {
+    session.headers = { sessionId: session.id };
   }
 
   async handleMessage(session, message) {

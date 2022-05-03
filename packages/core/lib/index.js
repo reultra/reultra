@@ -1,11 +1,11 @@
 const Broker = require('./broker');
-const MessageManager = require('./message-manager');
+const Worker = require('./worker');
 const TcpServer = require('./tcp-server');
 const TcpGateway = require('./tcp-gateway');
 
 module.exports = {
   Broker,
-  MessageManager,
+  Worker,
   TcpServer,
   TcpGateway,
 };

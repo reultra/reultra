@@ -1,11 +1,12 @@
 const { EventEmitter, captureRejectionSymbol } = require('events');
 const Broker = require('./broker');
 
-class MessageManager extends EventEmitter {
+class Worker extends EventEmitter {
   constructor(options = {}) {
     const { deserialize, serialize } = options;
     super({ captureRejections: true });
     this.broker = new Broker();
+    this.exchange = options.exchange || 'worker';
     if (deserialize) this.deserialize = deserialize.bind(this);
     if (serialize) this.serialize = serialize.bind(this);
   }
@@ -14,10 +15,12 @@ class MessageManager extends EventEmitter {
     await this.broker.connect(...args);
   }
 
-  async subscribe(exchange, pattern) {
-    await this.broker.assertExchange(exchange, 'topic', { durable: false });
+  async subscribe(pattern) {
+    await this.broker.assertExchange(this.exchange, 'topic', {
+      durable: false,
+    });
     const { queue } = await this.broker.assertQueue('', { durable: false });
-    await this.broker.bindQueue(queue, exchange, pattern);
+    await this.broker.bindQueue(queue, this.exchange, pattern);
     return this.broker.consume(queue, this.handleConsume.bind(this), {
       noAck: true,
     });
@@ -73,11 +76,11 @@ class MessageManager extends EventEmitter {
     throw new Error('abstract method serialize must be implemented');
   }
 
-  async publish(exchange, message, routingKey = message.constructor.key) {
+  async publish(exchange, routingKey, message) {
     return this.broker.publish(exchange, routingKey, this.serialize(message), {
       type: message.constructor.key,
     });
   }
 }
 
-module.exports = MessageManager;
+module.exports = Worker;

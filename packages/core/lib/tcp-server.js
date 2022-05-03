@@ -1,4 +1,3 @@
-const crypto = require('crypto');
 const { Server } = require('net');
 const { EventEmitter, captureRejectionSymbol } = require('events');
 
@@ -6,7 +5,6 @@ class TcpServer extends EventEmitter {
   constructor(options = {}) {
     super({ captureRejections: true });
     const { deserialize, serialize } = options;
-    this.uuid = crypto.randomUUID();
     this.totalConnectionCount = 0;
     this.sessions = new Map();
     if (deserialize) this.deserialize = deserialize.bind(this);
@@ -16,7 +14,7 @@ class TcpServer extends EventEmitter {
   handleConnection(socket) {
     this.totalConnectionCount += 1;
     const id = `session.${this.totalConnectionCount}`;
-    const session = { server: this.uuid, id, socket };
+    const session = { id, socket };
     this.sessions.set(id, session);
     socket.setNoDelay(true);
     let buffer = Buffer.alloc(0);
