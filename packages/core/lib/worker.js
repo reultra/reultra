@@ -18,32 +18,25 @@ class Worker extends EventEmitter {
   async connect(serviceType, ...args) {
     await this.broker.connect(...args);
     this.serviceType = serviceType;
-    await this.consume(
+    await this.broker.subscribe(
       this.serviceType,
       'x-consistent-hash',
       '1',
       this.emit.bind(this, 'message')
     );
-    await this.consume(
+    await this.broker.subscribe(
       `${this.serviceType}Handshake`,
       'x-consistent-hash',
       '1',
       this.handleHandshake.bind(this)
     );
-    await this.consume(
+    await this.broker.subscribe(
       this.uuid,
       'topic',
       'messages',
       this.emit.bind(this, 'message')
     );
     return this;
-  }
-
-  async consume(exchangeName, exchangeType, pattern, listener) {
-    await this.broker.assertExchange(exchangeName, exchangeType);
-    const { queue } = await this.broker.assertQueue();
-    await this.broker.bindQueue(queue, exchangeName, pattern);
-    await this.broker.consume(queue, listener);
   }
 
   handleMessage(message) {

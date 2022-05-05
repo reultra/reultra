@@ -11,16 +11,18 @@ class TcpGateway extends TcpServer {
 
   async connect(...args) {
     await this.worker.connect('gateway', ...args);
-    await this.broker.assertExchange(this.worker.uuid, 'topic');
-
-    const { queue: outbound } = await this.broker.assertQueue();
-    await this.broker.bindQueue(outbound, this.worker.uuid, 'serverMessages');
-    await this.broker.consume(outbound, this.handleServerMessage.bind(this));
-
-    const { queue: headers } = await this.broker.assertQueue();
-    await this.broker.bindQueue(headers, this.worker.uuid, 'headers');
-    await this.broker.consume(headers, this.handleHeaders.bind(this));
-
+    await this.broker.subscribe(
+      this.worker.uuid,
+      'topic',
+      'serverMessages',
+      this.handleServerMessage.bind(this)
+    );
+    await this.broker.subscribe(
+      this.worker.uuid,
+      'topic',
+      'headers',
+      this.handleHeaders.bind(this)
+    );
     return this;
   }
 

@@ -47,6 +47,13 @@ class Broker extends EventEmitter {
       ...options,
     });
   }
+
+  async subscribe(exchangeName, exchangeType, pattern, listener) {
+    await this.assertExchange(exchangeName, exchangeType);
+    const { queue } = await this.assertQueue();
+    await this.bindQueue(queue, exchangeName, pattern);
+    await this.consume(queue, listener);
+  }
 }
 
 module.exports = Broker;
