@@ -22,7 +22,7 @@ class Broker extends EventEmitter {
   }
 
   async assertQueue(queue, options) {
-    return this.channel.assertQueue(queue, options, {
+    return this.channel.assertQueue(queue, {
       durable: false,
       autoDelete: true,
       ...options,

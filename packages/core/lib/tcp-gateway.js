@@ -1,38 +1,55 @@
 const TcpServer = require('./tcp-server');
-const Broker = require('./broker');
 
 class TcpGateway extends TcpServer {
-  constructor(options = {}) {
+  constructor(worker, options = {}) {
     super(options);
-    this.exchange = options.exchange || 'gateway';
-    this.broker = new Broker();
+    this.worker = worker;
+    this.broker = worker.broker;
     this.on('connect', this.handleConnect.bind(this));
-    this.on('message', this.handleMessage.bind(this));
+    this.on('message', this.handleNetMessage.bind(this));
   }
 
   async connect(...args) {
-    await this.broker.connect(...args);
-    await this.broker.assertExchange(this.exchange, 'topic', {
-      durable: false,
-    });
-    const { queue } = await this.broker.assertQueue('', { durable: false });
-    await this.broker.bindQueue(queue, this.exchange, 'session.*');
-    await this.broker.consume(
-      queue,
-      (message) => {
-        this.send(message.fields.routingKey, message);
-      },
-      { noAck: true }
-    );
+    await this.worker.connect('gateway', ...args);
+    await this.broker.assertExchange(this.worker.uuid, 'topic');
+
+    const { queue: outbound } = await this.broker.assertQueue();
+    await this.broker.bindQueue(outbound, this.worker.uuid, 'serverMessages');
+    await this.broker.consume(outbound, this.handleServerMessage.bind(this));
+
+    const { queue: headers } = await this.broker.assertQueue();
+    await this.broker.bindQueue(headers, this.worker.uuid, 'headers');
+    await this.broker.consume(headers, this.handleHeaders.bind(this));
+
+    return this;
   }
 
-  // eslint-disable-next-line class-methods-use-this
+  handleServerMessage(message) {
+    this.send(message.properties.headers.session, message);
+  }
+
   handleConnect(session) {
-    session.headers = { sessionId: session.id };
+    session.headers = {
+      session: session.id,
+      [this.worker.serviceType]: this.worker.uuid,
+    };
   }
 
-  async handleMessage(session, message) {
-    await this.broker.publish(message.service, message.key, message.payload, {
+  handleHeaders(message) {
+    const { headers } = message.properties;
+    const session = this.sessions.get(headers.session);
+    if (session) Object.assign(session.headers, headers);
+  }
+
+  async handleNetMessage(session, message) {
+    let exchange = session.headers[message.service];
+    let routingKey;
+    if (exchange) routingKey = 'messages';
+    else {
+      exchange = message.service;
+      routingKey = session.id;
+    }
+    await this.broker.publish(exchange, routingKey, message.payload, {
       headers: session.headers,
       type: message.key,
     });

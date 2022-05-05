@@ -13,9 +13,9 @@ class TcpServer extends EventEmitter {
 
   handleConnection(socket) {
     this.totalConnectionCount += 1;
-    const id = `session.${this.totalConnectionCount}`;
-    const session = { id, socket };
-    this.sessions.set(id, session);
+    const sessionId = this.totalConnectionCount.toString();
+    const session = { id: sessionId, socket };
+    this.sessions.set(sessionId, session);
     socket.setNoDelay(true);
     let buffer = Buffer.alloc(0);
     socket.on('data', (data) => {
@@ -40,7 +40,7 @@ class TcpServer extends EventEmitter {
       } while (message);
     });
     socket.on('close', () => {
-      this.sessions.delete(id);
+      this.sessions.delete(sessionId);
       this.emit('disconnect', session);
     });
     socket.on('error', () => {});
@@ -62,7 +62,7 @@ class TcpServer extends EventEmitter {
   }
 
   [captureRejectionSymbol](error, event, ...args) {
-    this.emit('logicError', error, event, ...args);
+    this.emitError('logicError', error, event, ...args);
   }
 
   // eslint-disable-next-line class-methods-use-this
