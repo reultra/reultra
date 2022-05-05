@@ -1,7 +1,7 @@
-const { Buffer } = require('buffer');
 const crypto = require('crypto');
 const SafeEventEmitter = require('./safe-event-emitter');
 const Broker = require('./broker');
+const WorkerContext = require('./worker-context');
 
 class Worker extends SafeEventEmitter {
   constructor(options = {}) {
@@ -51,7 +51,7 @@ class Worker extends SafeEventEmitter {
     this.emitSafe(
       message.properties.type,
       deserialized,
-      message.properties.headers
+      new WorkerContext(this, message.properties.headers)
     );
   }
 
@@ -65,34 +65,9 @@ class Worker extends SafeEventEmitter {
     throw new Error('abstract method serialize must be implemented');
   }
 
-  async handshake(serviceType, routingKey, headers) {
-    return this.broker.publish(
-      `${serviceType}Handshake`,
-      routingKey,
-      Buffer.alloc(0),
-      { headers }
-    );
-  }
-
-  async setHeaders(newHeaders, headers) {
-    return this.broker.publish(headers.gateway, 'headers', Buffer.alloc(0), {
-      headers: {
-        ...newHeaders,
-        session: headers.session,
-      },
-    });
-  }
-
   async handleHandshake(message) {
-    const { headers } = message.properties;
-    return this.setHeaders({ [this.serviceType]: this.uuid }, headers);
-  }
-
-  async publish(exchange, routingKey, message, headers) {
-    return this.broker.publish(exchange, routingKey, this.serialize(message), {
-      headers,
-      type: message.constructor.key,
-    });
+    const context = new WorkerContext(this, message.properties.headers);
+    return context.setHeaders({ [this.serviceType]: this.uuid });
   }
 }
 
