@@ -1,12 +1,12 @@
 const { Buffer } = require('buffer');
 const crypto = require('crypto');
-const { EventEmitter, captureRejectionSymbol } = require('events');
+const SafeEventEmitter = require('./safe-event-emitter');
 const Broker = require('./broker');
 
-class Worker extends EventEmitter {
+class Worker extends SafeEventEmitter {
   constructor(options = {}) {
     const { deserialize, serialize } = options;
-    super({ captureRejections: true });
+    super();
     this.serviceType = null;
     this.uuid = crypto.randomUUID();
     this.broker = new Broker();
@@ -48,33 +48,11 @@ class Worker extends EventEmitter {
       this.emitError('messageError', error);
       return;
     }
-    try {
-      this.emit(
-        message.properties.type,
-        deserialized,
-        message.properties.headers
-      );
-    } catch (error) {
-      this.emitError(
-        'logicError',
-        error,
-        message.properties.type,
-        deserialized,
-        message.properties.headers
-      );
-    }
-  }
-
-  emitError(errorName, error, ...args) {
-    if (this.listenerCount(errorName) > 0) {
-      this.emit(errorName, error, ...args);
-    } else {
-      this.emit('error', error);
-    }
-  }
-
-  [captureRejectionSymbol](error, event, ...args) {
-    this.emitError('logicError', error, event, ...args);
+    this.emitSafe(
+      message.properties.type,
+      deserialized,
+      message.properties.headers
+    );
   }
 
   // eslint-disable-next-line class-methods-use-this

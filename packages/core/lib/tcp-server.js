@@ -1,7 +1,7 @@
 const { Server } = require('net');
-const { EventEmitter, captureRejectionSymbol } = require('events');
+const SafeEventEmitter = require('./safe-event-emitter');
 
-class TcpServer extends EventEmitter {
+class TcpServer extends SafeEventEmitter {
   constructor(options = {}) {
     super({ captureRejections: true });
     const { deserialize, serialize } = options;
@@ -31,11 +31,7 @@ class TcpServer extends EventEmitter {
         }
         if (message) {
           buffer = buffer.subarray(message.size);
-          try {
-            this.emit('message', session, message);
-          } catch (error) {
-            this.emitError('logicError', error, 'message', session, message);
-          }
+          this.emitSafe('message', session, message);
         }
       } while (message);
     });
@@ -51,18 +47,6 @@ class TcpServer extends EventEmitter {
     const server = new Server();
     server.on('connection', this.handleConnection.bind(this));
     return server.listen(...args);
-  }
-
-  emitError(errorName, error, ...args) {
-    if (this.listenerCount(errorName) > 0) {
-      this.emit(errorName, error, ...args);
-    } else {
-      this.emit('error', error);
-    }
-  }
-
-  [captureRejectionSymbol](error, event, ...args) {
-    this.emitError('logicError', error, event, ...args);
   }
 
   // eslint-disable-next-line class-methods-use-this

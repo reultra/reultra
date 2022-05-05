@@ -1,7 +1,6 @@
-const { EventEmitter } = require('events');
 const amqp = require('amqplib');
 
-class Broker extends EventEmitter {
+class Broker {
   static async connect(...args) {
     const broker = new this();
     await broker.connect(...args);
