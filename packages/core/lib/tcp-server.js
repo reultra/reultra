@@ -4,11 +4,13 @@ const SafeEventEmitter = require('./safe-event-emitter');
 class TcpServer extends SafeEventEmitter {
   constructor(options = {}) {
     super({ captureRejections: true });
-    const { deserialize, serialize } = options;
+    const { deserialize, serialize, timeout = 0 } = options;
     this.totalConnectionCount = 0;
+    this.timeout = timeout;
     this.sessions = new Map();
     if (deserialize) this.deserialize = deserialize.bind(this);
     if (serialize) this.serialize = serialize.bind(this);
+    this.on('data', this.handleData.bind(this));
   }
 
   handleConnection(socket) {
@@ -17,28 +19,14 @@ class TcpServer extends SafeEventEmitter {
     const session = { id: sessionId, socket };
     this.sessions.set(sessionId, session);
     socket.setNoDelay(true);
-    let buffer = Buffer.alloc(0);
-    socket.on('data', (data) => {
-      buffer = Buffer.concat([buffer, data]);
-      let message;
-      do {
-        try {
-          message = this.deserialize(session, buffer);
-        } catch (error) {
-          this.emitError('messageError', error);
-          socket.destroy(error);
-          return;
-        }
-        if (message) {
-          buffer = buffer.subarray(message.size);
-          this.emitSafe('message', session, message);
-        }
-      } while (message);
-    });
+    socket.setTimeout(this.timeout);
+    const ref = { buffer: Buffer.alloc(0) };
+    socket.on('data', this.emit.bind(this, 'data', session, ref));
     socket.on('close', () => {
       this.sessions.delete(sessionId);
       this.emit('disconnect', session);
     });
+    socket.on('timeout', this.emit.bind(this, 'timeout', session));
     socket.on('error', () => {});
     this.emit('connect', session);
   }
@@ -47,6 +35,23 @@ class TcpServer extends SafeEventEmitter {
     const server = new Server();
     server.on('connection', this.handleConnection.bind(this));
     return server.listen(...args);
+  }
+
+  handleData(session, ref, data) {
+    ref.buffer = Buffer.concat([ref.buffer, data]);
+    let message;
+    do {
+      try {
+        message = this.deserialize(session, ref);
+      } catch (error) {
+        this.emitError('messageError', error);
+        session.socket.destroy(error);
+        return;
+      }
+      if (message) {
+        this.emitSafe('message', session, message);
+      }
+    } while (message);
   }
 
   // eslint-disable-next-line class-methods-use-this

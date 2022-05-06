@@ -13,6 +13,7 @@ class Worker extends SafeEventEmitter {
     if (deserialize) this.deserialize = deserialize.bind(this);
     if (serialize) this.serialize = serialize.bind(this);
     this.on('message', this.handleMessage.bind(this));
+    this.on('serverEvent', this.handleServerEvent.bind(this));
   }
 
   async connect(serviceType, ...args) {
@@ -53,6 +54,10 @@ class Worker extends SafeEventEmitter {
       deserialized,
       new WorkerContext(this, message.properties.headers)
     );
+  }
+
+  handleServerEvent(eventName, data, headers) {
+    this.emitSafe(eventName, data, new WorkerContext(this, headers));
   }
 
   // eslint-disable-next-line class-methods-use-this
